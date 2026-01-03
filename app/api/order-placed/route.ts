@@ -28,7 +28,16 @@ export async function POST(request: Request) {
             return Response.json({ error: 'Order not found' }, { status: 404 });
         }
 
-        const { user_id: userId, restaurant_id: restaurantId, total_amount: totalAmount, otp } = order as any;
+        let { user_id: userId, restaurant_id: restaurantId, total_amount: totalAmount, otp } = order as any;
+
+        if (!otp) {
+            otp = Math.floor(100000 + Math.random() * 900000).toString();
+            await supabase
+                .from('orders')
+                .update({ otp } as any)
+                .eq('id', orderId);
+            console.log('Generated new OTP:', otp);
+        }
 
         // 2. Fetch User Details
         const { data: user } = await supabase

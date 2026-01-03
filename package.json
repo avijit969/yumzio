@@ -11,6 +11,8 @@
   "dependencies": {
     "@react-email/components": "^1.0.3",
     "@react-email/render": "^2.0.1",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.89.0",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.562.0",
     "next": "16.1.1",

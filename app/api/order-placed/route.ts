@@ -70,36 +70,46 @@ export async function POST(request: Request) {
         const userTokens = devices?.filter(d => d.user_id === userId).map(d => d.token).filter(Boolean) || [];
         console.log('Admin tokens:', adminTokens);
         console.log('User tokens:', userTokens);
-        const notifications = [
-            ...adminTokens.map(token => ({
-                to: token,
-                sound: 'default',
-                title: 'New Order Received! 🚨',
-                body: `New order #${orderId} from ${firstName} for ₹${totalAmount}`,
-                data: { orderId, screen: 'admin/orders' }
-            })),
-            ...userTokens.map(token => ({
-                to: token,
-                sound: 'default',
-                title: 'Order Placed Successfully! 🎉',
-                body: `Your order from ${restaurantName} has been placed. #${orderId}`,
-                data: { orderId, screen: 'order-details' }
-            }))
-        ];
+        const adminNotifications = adminTokens.map(token => ({
+            to: token,
+            sound: 'default',
+            title: 'New Order Received! 🚨',
+            body: `New order #${orderId} from ${firstName} for ₹${totalAmount}`,
+            data: { orderId, screen: 'admin/orders' }
+        }));
 
-        if (notifications.length > 0) {
-            await fetch('https://exp.host/--/api/v2/push/send', {
+        const userNotifications = userTokens.map(token => ({
+            to: token,
+            sound: 'default',
+            title: 'Order Placed Successfully! 🎉',
+            body: `Your order from ${restaurantName} has been placed. #${orderId}`,
+            data: { orderId, screen: 'order-details' }
+        }));
+
+        const sendPush = async (batch: any[]) => {
+             if (batch.length === 0) return;
+             const response = await fetch('https://exp.host/--/api/v2/push/send', {
                 method: 'POST',
                 headers: {
                     Accept: 'application/json',
                     'Accept-encoding': 'gzip, deflate',
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(notifications),
+                body: JSON.stringify(batch),
             });
-        }
+            const responseData = await response.json();
+            console.log('Push notification response:', responseData);
+             if (!response.ok) {
+                 console.error('Expo Push Error Details:', JSON.stringify(responseData, null, 2));
+            }
+        };
 
-        console.log(`Sent ${notifications.length} push notifications`);
+        await Promise.all([
+            sendPush(adminNotifications),
+            sendPush(userNotifications)
+        ]);
+
+        console.log(`Sent ${adminNotifications.length + userNotifications.length} push notifications`);
         
         // 2. send email to user
         const { data, error } = await resend.emails.send({

@@ -7,32 +7,62 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        let { firstName, email, orderId, otp, restaurantName, totalAmount, items, userId } = body;
+        const { orderId } = body;
+
+        if (!orderId) {
+            return Response.json({ error: 'Missing orderId' }, { status: 400 });
+        }
         
-        // 1. send push notification to user and admin
         const supabase = await createClient();
         const ADMIN_ID = '28e38aaf-17fb-4eee-a619-d1c4b3df269e';
+
+        // 1. Fetch Order Details
+        const { data: order, error: orderError } = await supabase
+            .from('orders')
+            .select('user_id, restaurant_id, total_amount, otp')
+            .eq('id', orderId)
+            .single();
+
+        if (orderError || !order) {
+            return Response.json({ error: 'Order not found' }, { status: 404 });
+        }
+
+        const { user_id: userId, restaurant_id: restaurantId, total_amount: totalAmount, otp } = order as any;
+
+        // 2. Fetch User Details
+        const { data: user } = await supabase
+            .from('users')
+            .select('full_name, email')
+            .eq('id', userId)
+            .single();
+
+        const firstName = user?.full_name?.split(' ')[0] || 'Customer';
+        const email = user?.email || '';
+
+        // 3. Fetch Restaurant Details
+        const { data: restaurant } = await supabase
+            .from('restaurants')
+            .select('name')
+            .eq('id', restaurantId)
+            .single();
+
+        const restaurantName = restaurant?.name || 'Restaurant';
+
+        // 4. Fetch Order Items
+        const { data: dbItems } = await supabase
+            .from('order_items')
+            .select('quantity, menu_items(name, price)')
+            .eq('order_id', orderId);
+
+        const items: string[] = dbItems?.map((item: any) => 
+            `${item.quantity} x ${item.menu_items?.name} (₹${item.menu_items?.price})`
+        ) || [];
         
+        // 5. Fetch Push Tokens
         const { data: devices } = await supabase
             .from('logged_in_devices')
             .select('token, user_id')
             .or(`user_id.eq.${userId},user_id.eq.${ADMIN_ID}`);
-
-        // Fallback: Fetch items if missing (handling race condition from DB triggers)
-        if (!items || items.length === 0) {
-            const { data: dbItems } = await supabase
-                .from('order_items')
-                .select('quantity, menu_items(name, price)')
-                .eq('order_id', orderId);
-            
-            if (dbItems) {
-                items = dbItems.map((item: any) => ({
-                    name: item.menu_items?.name,
-                    price: item.menu_items?.price,
-                    quantity: item.quantity
-                }));
-            }
-        }
 
         const adminTokens = devices?.filter(d => d.user_id === ADMIN_ID).map(d => d.token).filter(Boolean) || [];
         const userTokens = devices?.filter(d => d.user_id === userId).map(d => d.token).filter(Boolean) || [];

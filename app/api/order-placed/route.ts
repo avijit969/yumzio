@@ -12,7 +12,7 @@ export async function POST(request: Request) {
         if (!orderId) {
             return Response.json({ error: 'Missing orderId' }, { status: 400 });
         }
-        
+        console.log('Order ID:', orderId);
         const supabase = await createClient();
         const ADMIN_ID = '28e38aaf-17fb-4eee-a619-d1c4b3df269e';
 
@@ -22,7 +22,8 @@ export async function POST(request: Request) {
             .select('user_id, restaurant_id, total_amount, otp')
             .eq('id', orderId)
             .single();
-
+            console.log('Order:', order);
+            console.log('Order Error:', orderError);
         if (orderError || !order) {
             return Response.json({ error: 'Order not found' }, { status: 404 });
         }
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
             .select('full_name, email')
             .eq('id', userId)
             .single();
+            console.log('User:', user);
 
         const firstName = user?.full_name?.split(' ')[0] || 'Customer';
         const email = user?.email || '';
@@ -46,7 +48,7 @@ export async function POST(request: Request) {
             .eq('id', restaurantId)
             .single();
 
-        const restaurantName = restaurant?.name || 'Restaurant';
+        const restaurantName = restaurant?.name || 'Yumzio Restaurant';
 
         // 4. Fetch Order Items
         const { data: dbItems } = await supabase
